@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrainMap – Brainstorm Canvas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F5F4F0;
+  --srf: #FFFFFF;
+  --srf2: #FAFAF8;
+  --txt: #1E1D1B;
+  --t2: #65635E;
+  --t3: #A09E98;
+  --bdr: rgba(0,0,0,.09);
+  --bdr2: rgba(0,0,0,.15);
+  --r: 9px; --rl: 14px;
+  --acc: #4A41A8;
+  --acc-l: #EEEDFE;
+  --shadow: 0 2px 12px rgba(0,0,0,.1), 0 0 0 .5px rgba(0,0,0,.06);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,.16), 0 0 0 .5px rgba(0,0,0,.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--txt); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; font-size: 14px; }
+
+/* ── Toolbar ─────────────────────────────── */
+.tb { height: 52px; background: var(--srf); border-bottom: .5px solid var(--bdr); display: flex; align-items: center; gap: 5px; padding: 0 14px; flex-shrink: 0; z-index: 10; }
+.tb-logo { font-family: 'Instrument Serif', Georgia, serif; font-size: 17px; color: var(--acc); white-space: nowrap; margin-right: 2px; letter-spacing: -.01em; }
+.sep { width: .5px; height: 18px; background: var(--bdr2); margin: 0 3px; flex-shrink: 0; }
+.btn { height: 30px; padding: 0 11px; border: .5px solid var(--bdr2); border-radius: var(--r); background: transparent; color: var(--txt); font-size: 12px; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: background .12s; white-space: nowrap; }
+.btn:hover { background: #EEECEA; }
+.btn.on  { background: var(--acc-l); color: #3C3489; border-color: #8880D8; }
+.btn.on-r{ background: #FCEBEB; color: #501313; border-color: #E24B4A; }
+.btn.on-g{ background: #EAF3DE; color: #173404; border-color: #639922; }
+.tb-in { height: 30px; padding: 0 10px; border: .5px solid var(--bdr2); border-radius: var(--r); font-size: 12px; font-family: inherit; background: var(--srf2); color: var(--txt); outline: none; width: 152px; }
+.tb-in:focus { border-color: var(--acc); background: var(--srf); }
+.tb-sel { height: 30px; padding: 0 8px; border: .5px solid var(--bdr2); border-radius: var(--r); font-size: 12px; font-family: inherit; background: var(--srf2); color: var(--txt); cursor: pointer; outline: none; max-width: 130px; }
+.spc { flex: 1; }
+
+/* ── Canvas ──────────────────────────────── */
+#cvwrap { flex: 1; position: relative; overflow: hidden; }
+#bsvg { display: block; width: 100%; height: 100%; }
+
+/* ── Hint bar ────────────────────────────── */
+.hbar { height: 27px; background: var(--srf); border-top: .5px solid var(--bdr); display: flex; align-items: center; padding: 0 14px; font-size: 11px; color: var(--t3); flex-shrink: 0; gap: 6px; }
+.hbar .hr { margin-left: auto; color: var(--t2); font-weight: 500; }
+
+/* ── Legend panel ────────────────────────── */
+.lp { position: fixed; top: 52px; right: 0; bottom: 27px; width: 320px; background: var(--srf); border-left: .5px solid var(--bdr); z-index: 20; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .24s cubic-bezier(.4,0,.2,1); }
+.lp.open { transform: translateX(0); box-shadow: -6px 0 24px rgba(0,0,0,.07); }
+.lp-hd { padding: 14px 16px 11px; border-bottom: .5px solid var(--bdr); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.lp-hd h3 { font-size: 13px; font-weight: 500; letter-spacing: -.01em; }
+.lp-hd small { font-size: 11px; color: var(--t3); margin-top: 2px; }
+.lp-sc { flex: 1; overflow-y: auto; }
+.lp-sc::-webkit-scrollbar { width: 4px; }
+.lp-sc::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 4px; }
+.cr { padding: 12px 16px 14px; border-bottom: .5px solid var(--bdr); }
+.cr-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.cr-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cr-nm { font-size: 12.5px; font-weight: 500; flex: 1; }
+.cr-cnt { font-size: 11px; color: var(--t3); margin-right: 4px; }
+.cr-ed { font-size: 11px; color: var(--t3); cursor: pointer; border: .5px solid transparent; border-radius: 5px; padding: 2px 7px; background: transparent; font-family: inherit; transition: all .1s; }
+.cr-ed:hover { border-color: var(--bdr2); background: var(--bg); color: var(--t2); }
+.cr-ds { font-size: 11.5px; color: var(--t2); line-height: 1.6; margin-bottom: 8px; }
+.cr-ex { display: flex; flex-wrap: wrap; gap: 3px; }
+.cr-tag { font-size: 10.5px; padding: 2px 7px; border-radius: 20px; border: .5px solid; white-space: nowrap; }
+.lp-ft { padding: 11px 16px; border-top: .5px solid var(--bdr); flex-shrink: 0; }
+.lp-add { width: 100%; padding: 7px 12px; border: .5px dashed var(--bdr2); border-radius: var(--r); background: transparent; color: var(--t2); font-size: 12px; cursor: pointer; text-align: left; font-family: inherit; transition: background .12s; }
+.lp-add:hover { background: var(--bg); color: var(--txt); }
+
+/* ── Modal ───────────────────────────────── */
+.ov { position: fixed; inset: 0; background: rgba(0,0,0,.38); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); }
+.md { background: var(--srf); border-radius: var(--rl); width: 100%; max-width: 480px; max-height: 84vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg); }
+.md-hd { padding: 16px 18px 12px; border-bottom: .5px solid var(--bdr); display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; gap: 10px; }
+.md-hd div { flex: 1; }
+.md-hd h3 { font-size: 14px; font-weight: 500; letter-spacing: -.01em; }
+.md-hd p { font-size: 12px; color: var(--t2); margin-top: 2px; }
+.md-x { background: none; border: none; cursor: pointer; color: var(--t3); font-size: 22px; line-height: 1; padding: 0 2px; flex-shrink: 0; margin-top: -2px; }
+.md-x:hover { color: var(--txt); }
+.md-bd { padding: 16px 18px; flex: 1; overflow-y: auto; }
+.md-ft { padding: 12px 18px; border-top: .5px solid var(--bdr); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; align-items: center; }
+.ff { margin-bottom: 15px; }
+.ff:last-child { margin-bottom: 0; }
+.fl { font-size: 12px; font-weight: 500; color: var(--t2); margin-bottom: 5px; display: block; letter-spacing: .01em; }
+.fl span { font-weight: 400; color: var(--t3); }
+.fi, .fta { width: 100%; padding: 8px 10px; border: .5px solid var(--bdr2); border-radius: var(--r); font-size: 13px; background: var(--srf2); color: var(--txt); font-family: inherit; outline: none; }
+.fi:focus, .fta:focus { border-color: var(--acc); background: var(--srf); }
+.fta { resize: vertical; min-height: 70px; line-height: 1.55; }
+.mb { height: 33px; padding: 0 14px; border-radius: var(--r); font-size: 13px; cursor: pointer; border: .5px solid var(--bdr2); background: transparent; color: var(--txt); font-family: inherit; transition: background .12s; }
+.mb:hover { background: #EEECEA; }
+.mb-p { background: var(--acc); color: #fff; border-color: var(--acc); }
+.mb-p:hover { background: #3e38a0; }
+.mb-d { background: #FFF0F0; color: #5C1A1A; border-color: #E05555; }
+.mb-d:hover { background: #FFE4E4; }
+
+/* ── Color picker ────────────────────────── */
+.cpg { display: flex; flex-wrap: wrap; gap: 9px; padding: 5px 0; }
+.cpo { width: 27px; height: 27px; border-radius: 50%; cursor: pointer; border: 2.5px solid transparent; transition: transform .12s; position: relative; }
+.cpo:hover { transform: scale(1.18); }
+.cpo.sel { border-color: var(--txt); }
+.cpo.sel::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: rgba(0,0,0,.5); }
+
+/* ── Tag editor ──────────────────────────── */
+.tw { display: flex; flex-wrap: wrap; gap: 5px; padding: 5px 0; min-height: 36px; }
+.tp { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11.5px; background: var(--acc-l); color: #3C3489; border: .5px solid #AFA9EC; }
+.tr { cursor: pointer; opacity: .5; line-height: 1; padding: 0 1px; }
+.tr:hover { opacity: 1; }
+.ta { border: .5px dashed var(--bdr2); border-radius: 20px; padding: 3px 10px; font-size: 11.5px; background: transparent; color: var(--txt); outline: none; width: 118px; font-family: inherit; }
+.ta:focus { border-color: var(--acc); background: var(--srf); }
+
+/* ── Connection picker ───────────────────── */
+.ap-intro { font-size: 12px; color: var(--t2); line-height: 1.6; padding: 2px 0 12px; border-bottom: .5px solid var(--bdr); margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
+.ap-intro svg { flex-shrink: 0; margin-top: 1px; }
+.cs { margin-bottom: 8px; }
+.cs-tt { font-size: 10.5px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; padding-bottom: 4px; border-bottom: .5px solid var(--bdr); display: flex; align-items: center; gap: 6px; }
+.cs-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.ci { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 7px; cursor: pointer; transition: background .1s; }
+.ci:hover { background: var(--bg); }
+.ci input[type=checkbox] { flex-shrink: 0; accent-color: var(--acc); cursor: pointer; width: 14px; height: 14px; }
+.ci-nm { font-size: 12.5px; font-weight: 500; flex: 1; }
+.ci-cat { font-size: 11px; color: var(--t3); }
+.ai-b { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: var(--acc-l); color: #3C3489; border: .5px solid #AFA9EC; flex-shrink: 0; }
+.ldg { font-size: 12px; color: var(--t2); padding: 12px 0; display: flex; align-items: center; gap: 8px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.spn { width: 14px; height: 14px; border: 1.5px solid var(--bdr); border-top-color: var(--acc); border-radius: 50%; animation: sp .75s linear infinite; flex-shrink: 0; }
+.no-ai { font-size: 11.5px; color: var(--t3); padding: 0 0 10px; line-height: 1.65; background: var(--srf2); border: .5px solid var(--bdr); border-radius: var(--r); padding: 9px 12px; margin-bottom: 12px; }
+a { color: var(--acc); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Node tooltip ────────────────────────── */
+.nt { position: absolute; background: var(--srf); border: .5px solid var(--bdr); border-radius: var(--r); padding: 6px 10px; font-size: 11.5px; color: var(--t2); pointer-events: none; white-space: nowrap; box-shadow: var(--shadow); opacity: 0; transition: opacity .15s; z-index: 30; }
+.nt.show { opacity: 1; }
+
+/* Scrollbar */
+.md-bd::-webkit-scrollbar { width: 4px; }
+.md-bd::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="tb">
+  <span class="tb-logo">✦ BrainMap</span>
+  <div class="sep"></div>
+  <button class="btn on" id="b-sel" onclick="setMode('select')">◎ Select</button>
+  <button class="btn" id="b-con" onclick="setMode('connect')">⌁ Connect</button>
+  <button class="btn" id="b-del" onclick="setMode('delete')">✕ Delete</button>
+  <div class="sep"></div>
+  <input class="tb-in" id="add-in" type="text" placeholder="New idea…" onkeydown="if(event.key==='Enter')openAddFlow()">
+  <select class="tb-sel" id="add-cat"></select>
+  <button class="btn" onclick="openAddFlow()">Add →</button>
+  <div class="spc"></div>
+  <button class="btn" id="b-leg" onclick="toggleLegend()">☰ Clusters</button>
+  <button class="btn" onclick="openSettings()" title="Settings">⚙</button>
+</div>
+
+<div id="cvwrap">
+  <svg id="bsvg"></svg>
+  <div class="nt" id="tooltip"></div>
+</div>
+
+<div class="hbar">
+  <span id="h-main">Click a node to highlight connections · Drag to rearrange · Add ideas using the toolbar above</span>
+  <span class="hr" id="h-r"></span>
+</div>
+
+<!-- Legend Panel -->
+<aside class="lp" id="lp">
+  <div class="lp-hd">
+    <div><h3>Cluster Guide</h3><small>Your brainstorm categories with examples</small></div>
+    <button class="md-x" onclick="toggleLegend()">×</button>
+  </div>
+  <div class="lp-sc" id="lp-bd"></div>
+  <div class="lp-ft"><button class="lp-add" onclick="openClusterModal(null)">+ Add new cluster</button></div>
+</aside>
+
+<!-- Cluster Modal -->
+<div class="ov" id="cm-ov" style="display:none" onclick="if(event.target===this)closeOv('cm-ov')">
+  <div class="md">
+    <div class="md-hd">
+      <div><h3 id="cm-tt">Edit cluster</h3><p id="cm-sub">Define what this cluster means for your brainstorm</p></div>
+      <button class="md-x" onclick="closeOv('cm-ov')">×</button>
+    </div>
+    <div class="md-bd">
+      <div class="ff"><label class="fl">Cluster name</label><input class="fi" id="cm-nm" type="text" placeholder="e.g. Inspirations"></div>
+      <div class="ff"><label class="fl">Color</label><div class="cpg" id="cm-clr"></div></div>
+      <div class="ff"><label class="fl">Description <span>– what does this cluster represent?</span></label><textarea class="fta" id="cm-ds" placeholder="e.g. The physical products you design and deliver to clients…"></textarea></div>
+      <div class="ff"><label class="fl">Examples <span>– press Enter or comma to add</span></label><div class="tw" id="cm-ex"></div></div>
+    </div>
+    <div class="md-ft">
+      <button class="mb mb-d" id="cm-db" onclick="deleteCluster()" style="margin-right:auto">Delete cluster</button>
+      <button class="mb" onclick="closeOv('cm-ov')">Cancel</button>
+      <button class="mb mb-p" onclick="saveCluster()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Connection Picker Modal -->
+<div class="ov" id="ap-ov" style="display:none" onclick="if(event.target===this)closeOv('ap-ov')">
+  <div class="md" style="max-width:510px">
+    <div class="md-hd">
+      <div><h3 id="ap-tt">Where should this idea connect?</h3><p>Select which existing ideas to link it with</p></div>
+      <button class="md-x" onclick="closeOv('ap-ov')">×</button>
+    </div>
+    <div class="md-bd" id="ap-bd"></div>
+    <div class="md-ft">
+      <span style="font-size:11.5px;color:var(--t3);margin-right:auto" id="ap-cnt"></span>
+      <button class="mb" onclick="closeOv('ap-ov')">Cancel</button>
+      <button class="mb mb-p" onclick="confirmAdd()">Add to map →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="ov" id="st-ov" style="display:none" onclick="if(event.target===this)closeOv('st-ov')">
+  <div class="md" style="max-width:430px">
+    <div class="md-hd"><div><h3>Settings</h3></div><button class="md-x" onclick="closeOv('st-ov')">×</button></div>
+    <div class="md-bd">
+      <div class="ff">
+        <label class="fl">Anthropic API Key <span>– for AI-powered connection suggestions</span></label>
+        <input class="fi" id="ak-in" type="password" placeholder="sk-ant-…">
+        <p style="font-size:11.5px;color:var(--t3);margin-top:7px;line-height:1.65">Stored only in your browser. Get a free key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Without a key, smart rule-based suggestions are used instead.</p>
+      </div>
+      <div class="ff" style="border-top:.5px solid var(--bdr);padding-top:15px">
+        <label class="fl">Reset map</label>
+        <p style="font-size:12px;color:var(--t2);margin-bottom:10px">Clears all your nodes, links, and custom clusters. Cannot be undone.</p>
+        <button class="mb mb-d" onclick="confirmReset()">Reset to defaults</button>
+      </div>
+    </div>
+    <div class="md-ft">
+      <button class="mb" onclick="closeOv('st-ov')">Cancel</button>
+      <button class="mb mb-p" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+// ══════════ COLORS & DEFAULTS ══════════════
+const C = {
+  purple:{ bg:'#EEEDFE', s:'#7F77DD', t:'#3C3489' },
+  teal:  { bg:'#E1F5EE', s:'#1D9E75', t:'#085041' },
+  coral: { bg:'#FAECE7', s:'#D85A30', t:'#712B13' },
+  amber: { bg:'#FAEEDA', s:'#BA7517', t:'#412402' },
+  blue:  { bg:'#E6F1FB', s:'#378ADD', t:'#0C447C' },
+  pink:  { bg:'#FBEAF0', s:'#D4537E', t:'#4B1528' },
+  green: { bg:'#EAF3DE', s:'#639922', t:'#173404' },
+  red:   { bg:'#FCEBEB', s:'#E24B4A', t:'#501313' },
+  gray:  { bg:'#F1EFE8', s:'#888780', t:'#2C2C2A' },
+};
+const CK = Object.keys(C);
+
+const DEF_CL = {
+  central:  { name:'Core Concept',         ck:'purple', desc:'The heart of your brainstorm. Everything else connects back to this central idea.', ex:[] },
+  products: { name:'Products',             ck:'teal',   desc:'The actual physical or digital items you design and deliver to clients. These form the backbone of your portfolio — what clients actually order from you.',                                                    ex:['Wedding Invitations','Save the Dates','Menu Cards','Place Cards','Ceremony Programs','Table Numbers','Thank You Cards','Event Signage','Envelope Liners','Wax Seal Kits'] },
+  styles:   { name:'Aesthetics',           ck:'coral',  desc:'Visual moods and design directions your work can embody. Each style speaks to a different type of client and shapes your overall portfolio identity.',                                                         ex:['Minimalist & Modern','Luxury Gold Foil','Rustic & Bohemian','Vintage & Romantic','Bold & Colorful','Art Deco','Maximalist Florals','Dark & Moody'] },
+  materials:{ name:'Materials & Techniques',ck:'amber', desc:'How things are physically made — print methods, paper types, and finishing touches. These affect pricing, perceived quality, and the type of client you attract.',                                              ex:['Digital Print','Letterpress','Foil Stamping','Watercolor Illustration','Vellum Overlays','Embossing','Hot Press Paper','Calligraphy','Laser Cut'] },
+  market:   { name:'Target Market',        ck:'blue',   desc:'Who you\'re designing for. Knowing your audience shapes everything from pricing tiers to how you present your portfolio and what events you attend.',                                                           ex:['Engaged Couples','Wedding Planners','Event Coordinators','Corporate Events','Baptism & Communion Families','Birthday Hosts','Venues & Hotels'] },
+  business: { name:'Business',             ck:'pink',   desc:'How you operate, get discovered, and get paid. The infrastructure that turns your creative work into a sustainable business — from platforms to pricing policies.',                                             ex:['Etsy Shop','Instagram Portfolio','Local Wedding Fairs','Vendor Partnerships','Pricing Tiers','Custom vs Templates','Rush Fee Policy','Digital Fulfillment'] },
+};
+
+const DEF_N = [
+  {id:0, label:'Wedding &\nEvent Stationery', cat:'central',  r:44},
+  {id:1, label:'Wedding\nInvitations',        cat:'products', r:30},
+  {id:2, label:'Save the\nDates',             cat:'products', r:25},
+  {id:3, label:'Menu Cards',                  cat:'products', r:21},
+  {id:4, label:'Place Cards',                 cat:'products', r:19},
+  {id:5, label:'Programs',                    cat:'products', r:19},
+  {id:6, label:'Table\nNumbers',              cat:'products', r:19},
+  {id:7, label:'Thank You\nCards',            cat:'products', r:23},
+  {id:8, label:'Event\nSignage',              cat:'products', r:21},
+  {id:9, label:'Minimalist\n& Modern',        cat:'styles',   r:26},
+  {id:10,label:'Luxury &\nGold Foil',         cat:'styles',   r:28},
+  {id:11,label:'Rustic &\nBohemian',          cat:'styles',   r:24},
+  {id:12,label:'Vintage &\nRomantic',         cat:'styles',   r:22},
+  {id:13,label:'Bold &\nColorful',            cat:'styles',   r:20},
+  {id:14,label:'Digital\nPrint',              cat:'materials',r:24},
+  {id:15,label:'Letterpress',                 cat:'materials',r:22},
+  {id:16,label:'Foil\nStamping',              cat:'materials',r:22},
+  {id:17,label:'Watercolor',                  cat:'materials',r:20},
+  {id:18,label:'Vellum',                      cat:'materials',r:18},
+  {id:19,label:'Brides &\nCouples',           cat:'market',   r:26},
+  {id:20,label:'Wedding\nPlanners',           cat:'market',   r:24},
+  {id:21,label:'Corporate\nEvents',           cat:'market',   r:22},
+  {id:22,label:'Instagram\nPortfolio',        cat:'business', r:22},
+  {id:23,label:'Etsy /\nOnline Shop',         cat:'business', r:20},
+  {id:24,label:'Local\nVendors',              cat:'business', r:20},
+  {id:25,label:'Pricing\nStrategy',           cat:'business', r:20},
+];
+
+const DEF_L = [
+  ...[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25].map(t=>({s:0,t})),
+  {s:1,t:9},{s:1,t:10},{s:1,t:11},{s:1,t:12},
+  {s:2,t:9},{s:2,t:12},{s:7,t:9},{s:7,t:12},
+  {s:10,t:16},{s:11,t:17},{s:9,t:14},
+  {s:15,t:10},{s:18,t:10},{s:18,t:9},
+  {s:19,t:1},{s:19,t:7},{s:19,t:2},
+  {s:20,t:1},{s:20,t:8},{s:20,t:3},
+  {s:21,t:3},{s:21,t:8},{s:21,t:4},
+  {s:22,t:10},{s:22,t:9},{s:23,t:14},
+  {s:24,t:20},{s:25,t:10},{s:25,t:14},
+].map(l=>({source:l.s,target:l.t}));
+
+// ══════════ STATE ══════════════════════════
+let nodes, links, clusters, nextId, apiKey;
+let svgW=800, svgH=600;
+let mode='select', selId=null, cfrom=null;
+let cmId=null, cmEx=[], cmCk='teal';
+let pNode=null, pSel=new Set();
+let lpOpen=false;
+
+function gId(n){ return typeof n==='object'&&n!==null?n.id:n; }
+
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem('bm_state')||'null');
+    if(s&&s.nodes&&s.links&&s.clusters){
+      nodes=s.nodes; links=s.links; clusters=s.clusters; nextId=s.nextId||100; return;
+    }
+  }catch(e){}
+  nodes=JSON.parse(JSON.stringify(DEF_N));
+  links=JSON.parse(JSON.stringify(DEF_L));
+  clusters=JSON.parse(JSON.stringify(DEF_CL));
+  nextId=26;
+}
+
+function saveState(){
+  try{
+    const sN=nodes.map(n=>({id:n.id,label:n.label,cat:n.cat,r:n.r,x:n.x,y:n.y}));
+    const sL=links.map(l=>({source:gId(l.source),target:gId(l.target)}));
+    localStorage.setItem('bm_state',JSON.stringify({nodes:sN,links:sL,clusters,nextId}));
+  }catch(e){}
+}
+
+apiKey = localStorage.getItem('bm_apikey')||'';
+
+// ══════════ D3 SIMULATION ══════════════════
+let svgEl, linksG, nodesG, sim;
+
+function initSim(){
+  const wrap=document.getElementById('cvwrap');
+  svgW=wrap.clientWidth; svgH=wrap.clientHeight;
+  svgEl=d3.select('#bsvg').attr('width',svgW).attr('height',svgH);
+  svgEl.append('rect').attr('width',svgW).attr('height',svgH).attr('fill','transparent')
+    .on('click',bgClick).on('dblclick',()=>document.getElementById('add-in').focus());
+  linksG=svgEl.append('g');
+  nodesG=svgEl.append('g');
+  sim=d3.forceSimulation()
+    .force('link',d3.forceLink().id(d=>d.id)
+      .distance(d=>(gId(d.source)===0||gId(d.target)===0)?155:95)
+      .strength(0.28))
+    .force('charge',d3.forceManyBody().strength(-250))
+    .force('center',d3.forceCenter(svgW/2,svgH/2))
+    .force('collide',d3.forceCollide().radius(d=>d.r+9))
+    .on('tick',ticked);
+  window.addEventListener('resize',()=>{
+    svgW=wrap.clientWidth; svgH=wrap.clientHeight;
+    svgEl.attr('width',svgW).attr('height',svgH);
+    svgEl.select('rect').attr('width',svgW).attr('height',svgH);
+    sim.force('center',d3.forceCenter(svgW/2,svgH/2)).alpha(.1).restart();
+  });
+}
+
+function ticked(){
+  linksG.selectAll('line')
+    .attr('x1',d=>d.source.x).attr('y1',d=>d.source.y)
+    .attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+  nodesG.selectAll('.ng').attr('transform',d=>{
+    const x=Math.max(d.r+2,Math.min(svgW-d.r-2,d.x||svgW/2));
+    const y=Math.max(d.r+2,Math.min(svgH-d.r-2,d.y||svgH/2));
+    return `translate(${x},${y})`;
+  });
+}
+
+// ══════════ RENDER ═════════════════════════
+function redraw(){
+  linksG.selectAll('*').remove();
+  nodesG.selectAll('*').remove();
+
+  linksG.selectAll('line').data(links).enter().append('line')
+    .attr('stroke-linecap','round').attr('fill','none');
+
+  const ng=nodesG.selectAll('.ng').data(nodes,d=>d.id)
+    .enter().append('g').attr('class','ng').style('cursor','grab');
+
+  ng.call(d3.drag()
+    .on('start',(e,d)=>{ if(!e.active)sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+    .on('drag', (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+    .on('end',  (e,d)=>{ if(!e.active)sim.alphaTarget(0); d.fx=null; d.fy=null; saveState(); }));
+
+  ng.on('click',(e,d)=>{ e.stopPropagation(); clickNode(d); })
+    .on('mouseenter',(e,d)=>showTooltip(e,d))
+    .on('mouseleave',hideTooltip);
+
+  ng.append('circle').each(function(d){
+    const c=C[clusters[d.cat]?.ck||'gray'];
+    d3.select(this).attr('r',d.r).attr('fill',c.bg).attr('stroke',c.s)
+      .attr('stroke-width',d.id===0?2.5:1.5);
+  });
+
+  ng.each(function(d){ drawText(d3.select(this),d); });
+
+  sim.nodes(nodes);
+  sim.force('link').links(links);
+  sim.alpha(.2).restart();
+  updateCatSel();
+  renderLegend();
+  highlight();
+  saveState();
+}
+
+function drawText(g,d){
+  g.selectAll('text').remove();
+  const c=C[clusters[d.cat]?.ck||'gray'];
+  const lines=d.label.split('\n');
+  const fs=d.id===0?'11.5px':d.r<20?'9px':'10.5px';
+  const t=g.append('text')
+    .attr('text-anchor','middle').attr('pointer-events','none')
+    .style('font-family',"'DM Sans',-apple-system,sans-serif")
+    .style('font-size',fs).style('font-weight',d.id===0?'600':'400')
+    .style('fill',c.t);
+  if(lines.length===1){
+    t.append('tspan').attr('x',0).attr('dy','.35em').text(lines[0]);
+  } else {
+    t.append('tspan').attr('x',0).attr('dy','-.5em').text(lines[0]);
+    t.append('tspan').attr('x',0).attr('dy','1.25em').text(lines[1]);
+  }
+}
+
+// ══════════ TOOLTIP ════════════════════════
+function showTooltip(e,d){
+  if(mode!=='select')return;
+  const conn=links.filter(l=>gId(l.source)===d.id||gId(l.target)===d.id).length;
+  const tip=document.getElementById('tooltip');
+  tip.textContent=`${d.label.replace('\n',' ')} · ${clusters[d.cat]?.name||d.cat} · ${conn} connection${conn!==1?'s':''}`;
+  tip.style.left=(e.offsetX+14)+'px'; tip.style.top=(e.offsetY-10)+'px';
+  tip.classList.add('show');
+}
+function hideTooltip(){ document.getElementById('tooltip').classList.remove('show'); }
+
+// ══════════ INTERACTIONS ═══════════════════
+function clickNode(d){
+  if(mode==='delete'){
+    if(d.id===0)return;
+    nodes=nodes.filter(n=>n.id!==d.id);
+    links=links.filter(l=>gId(l.source)!==d.id&&gId(l.target)!==d.id);
+    if(selId===d.id)selId=null;
+    redraw(); return;
+  }
+  if(mode==='connect'){
+    if(cfrom===null){
+      cfrom=d.id;
+      setHint(`Click another node to connect with "${d.label.replace('\n',' ')}"`);
+    } else if(cfrom!==d.id){
+      const a=cfrom,b=d.id;
+      if(!links.some(l=>{ const la=gId(l.source),lb=gId(l.target);return(la===a&&lb===b)||(la===b&&lb===a); })){
+        links.push({source:a,target:b}); saveState();
+      }
+      cfrom=null; setHint('Click a node to start a new connection');
+      redraw();
+    }
+    highlight(); return;
+  }
+  selId=(selId===d.id)?null:d.id;
+  highlight();
+}
+
+function bgClick(){
+  if(mode==='select'&&selId!==null){ selId=null; highlight(); }
+  if(mode==='connect'&&cfrom!==null){ cfrom=null; setHint('Click a node to start a connection'); highlight(); }
+}
+
+function highlight(){
+  const conn=new Set();
+  if(selId!==null) links.forEach(l=>{ const a=gId(l.source),b=gId(l.target); if(a===selId)conn.add(b); if(b===selId)conn.add(a); });
+  const sc=(selId!==null?(nodes.find(n=>n.id===selId)||{cat:'central'}).cat:'central');
+  const scol=C[clusters[sc]?.ck||'purple'].s;
+
+  nodesG.selectAll('.ng')
+    .attr('opacity',d=>selId===null?1:(d.id===selId||conn.has(d.id)?1:.09));
+  nodesG.selectAll('.ng').select('circle')
+    .attr('stroke-width',d=>d.id===cfrom?3.5:(d.id===selId?3:(d.id===0?2.5:1.5)))
+    .attr('stroke',d=>d.id===cfrom?'#534AB7':C[clusters[d.cat]?.ck||'gray'].s);
+  linksG.selectAll('line')
+    .attr('stroke',d=>{ const a=gId(d.source),b=gId(d.target); return selId!==null&&(a===selId||b===selId)?scol:'rgba(160,158,152,.45)'; })
+    .attr('stroke-opacity',d=>{ if(selId===null)return.42; const a=gId(d.source),b=gId(d.target); return(a===selId||b===selId)?.85:.04; })
+    .attr('stroke-width',d=>{ if(selId===null)return 1.2; const a=gId(d.source),b=gId(d.target); return(a===selId||b===selId)?2.5:.7; });
+
+  const sn=selId!==null?nodes.find(n=>n.id===selId):null;
+  document.getElementById('h-r').textContent=sn?`"${sn.label.replace('\n',' ')}" – ${conn.size} connection${conn.size!==1?'s':''}`:
+    `${nodes.length} nodes · ${links.length} links`;
+}
+
+// ══════════ MODE ═══════════════════════════
+const HINTS={
+  select: 'Click a node to highlight connections · Drag to rearrange',
+  connect:'Click a node, then click another to draw a connection',
+  delete: 'Click any node to remove it and all its connections',
+};
+function setMode(m){
+  mode=m; selId=null; cfrom=null;
+  document.getElementById('b-sel').className='btn'+(m==='select'?' on':'');
+  document.getElementById('b-con').className='btn'+(m==='connect'?' on-g':'');
+  document.getElementById('b-del').className='btn'+(m==='delete'?' on-r':'');
+  setHint(HINTS[m]); highlight();
+}
+function setHint(t){ document.getElementById('h-main').textContent=t; }
+
+// ══════════ LEGEND ═════════════════════════
+function toggleLegend(){
+  lpOpen=!lpOpen;
+  document.getElementById('lp').classList.toggle('open',lpOpen);
+  document.getElementById('b-leg').classList.toggle('on',lpOpen);
+}
+
+function renderLegend(){
+  const bd=document.getElementById('lp-bd'); bd.innerHTML='';
+  const ord=['central','products','styles','materials','market','business'];
+  const custom=Object.keys(clusters).filter(k=>!ord.includes(k));
+  [...ord,...custom].filter(k=>clusters[k]).forEach(k=>{
+    if(k==='central')return;
+    const cl=clusters[k], col=C[cl.ck||'gray'];
+    const cnt=nodes.filter(n=>n.cat===k).length;
+    const div=document.createElement('div'); div.className='cr';
+    const exTags=(cl.ex||[]).map(e=>`<span class="cr-tag" style="background:${col.bg};color:${col.t};border-color:${col.s}">${e}</span>`).join('');
+    div.innerHTML=`<div class="cr-hd">
+      <div class="cr-dot" style="background:${col.s}"></div>
+      <span class="cr-nm">${cl.name}</span>
+      <span class="cr-cnt">${cnt} node${cnt!==1?'s':''}</span>
+      <button class="cr-ed" onclick="openClusterModal('${k}')">Edit</button>
+    </div>
+    <p class="cr-ds">${cl.desc||''}</p>
+    <div class="cr-ex">${exTags||'<span style="font-size:11px;color:var(--t3)">No examples yet</span>'}</div>`;
+    bd.appendChild(div);
+  });
+}
+
+// ══════════ CLUSTER MODAL ══════════════════
+function openClusterModal(id){
+  cmId=id;
+  const isNew=id===null;
+  const cl=isNew?{name:'',ck:'teal',desc:'',ex:[]}:{...clusters[id],ex:[...(clusters[id].ex||[])]};
+  cmEx=[...(cl.ex||[])]; cmCk=cl.ck||'teal';
+  document.getElementById('cm-tt').textContent=isNew?'Add new cluster':`Edit: ${cl.name}`;
+  document.getElementById('cm-sub').textContent=isNew?'Create a new category for your brainstorm':'Update how this cluster is defined';
+  document.getElementById('cm-nm').value=cl.name||'';
+  document.getElementById('cm-ds').value=cl.desc||'';
+  document.getElementById('cm-db').style.display=isNew?'none':'';
+  renderColorPicker(); renderTagEditor();
+  document.getElementById('cm-ov').style.display='flex';
+  setTimeout(()=>document.getElementById('cm-nm').focus(),80);
+}
+
+function renderColorPicker(){
+  document.getElementById('cm-clr').innerHTML=CK.map(k=>
+    `<div class="cpo${k===cmCk?' sel':''}" style="background:${C[k].s}" title="${k}" onclick="pickColor('${k}')"></div>`
+  ).join('');
+}
+function pickColor(k){ cmCk=k; renderColorPicker(); }
+
+function renderTagEditor(){
+  const w=document.getElementById('cm-ex');
+  w.innerHTML=cmEx.map((e,i)=>`<span class="tp">${e}<span class="tr" onclick="rmTag(${i})">×</span></span>`).join('');
+  const inp=document.createElement('input');
+  inp.className='ta'; inp.placeholder='Add example…';
+  inp.onkeydown=ev=>{
+    if(ev.key==='Enter'||ev.key===','){
+      ev.preventDefault();
+      const v=inp.value.trim().replace(/,$/,'');
+      if(v){cmEx.push(v);renderTagEditor();}
+    }
+  };
+  w.appendChild(inp);
+}
+function rmTag(i){ cmEx.splice(i,1); renderTagEditor(); }
+
+function saveCluster(){
+  const nm=document.getElementById('cm-nm').value.trim();
+  if(!nm){alert('Please enter a cluster name.');return;}
+  const data={name:nm,ck:cmCk,desc:document.getElementById('cm-ds').value.trim(),ex:[...cmEx]};
+  if(cmId===null){ const nk='cl_'+Date.now(); clusters[nk]=data; }
+  else { clusters[cmId]={...clusters[cmId],...data}; }
+  closeOv('cm-ov'); redraw(); saveState();
+}
+
+function deleteCluster(){
+  if(!cmId||cmId==='central')return;
+  if(!confirm(`Delete cluster "${clusters[cmId].name}"?\n\nNodes in this cluster will be moved to Products.`))return;
+  nodes.forEach(n=>{ if(n.cat===cmId)n.cat='products'; });
+  delete clusters[cmId];
+  closeOv('cm-ov'); redraw(); saveState();
+}
+
+// ══════════ CLUSTER SELECT ═════════════════
+function updateCatSel(){
+  const sel=document.getElementById('add-cat');
+  const cur=sel.value;
+  const ord=['products','styles','materials','market','business'];
+  const custom=Object.keys(clusters).filter(k=>!ord.includes(k)&&k!=='central');
+  sel.innerHTML=[...ord,...custom].filter(k=>clusters[k])
+    .map(k=>`<option value="${k}"${k===cur?' selected':''}>${clusters[k].name}</option>`).join('');
+}
+
+// ══════════ ADD NODE FLOW ══════════════════
+function openAddFlow(){
+  const raw=document.getElementById('add-in').value.trim();
+  if(!raw){document.getElementById('add-in').focus();return;}
+  const cat=document.getElementById('add-cat').value||'products';
+
+  // Wrap long labels
+  let lbl=raw;
+  if(raw.length>13){
+    const mid=Math.floor(raw.length/2);
+    const sp=raw.lastIndexOf(' ',mid+5);
+    const sp2=raw.indexOf(' ',mid-5);
+    const best=sp>1?sp:(sp2>0?sp2:-1);
+    if(best>0)lbl=raw.slice(0,best)+'\n'+raw.slice(best+1);
+  }
+  const r=Math.max(22,Math.min(34,15+Math.ceil(raw.length*.72)));
+  pNode={id:nextId,label:lbl,cat,r};
+  pSel=new Set([0]); // central node pre-selected
+
+  document.getElementById('ap-tt').textContent=`Connect "${raw}" to…`;
+  const bd=document.getElementById('ap-bd');
+  bd.innerHTML='<div class="ldg"><div class="spn"></div>Finding best connections…</div>';
+  document.getElementById('ap-ov').style.display='flex';
+  updateSelCount();
+
+  if(apiKey){
+    getAI(raw,cat).then(sugg=>renderPicker(sugg)).catch(()=>renderPicker(getRules(cat)));
+  } else {
+    setTimeout(()=>renderPicker(getRules(cat)),180);
+  }
+}
+
+function getRules(cat){
+  const rel={
+    products:  ['styles','materials','market'],
+    styles:    ['products','materials'],
+    materials: ['products','styles'],
+    market:    ['products','business'],
+    business:  ['market','products'],
+  };
+  const related=rel[cat]||[];
+  const sugg=new Set();
+  nodes.forEach(n=>{ if(n.id!==0&&related.includes(n.cat))sugg.add(n.id); });
+  return sugg;
+}
+
+async function getAI(label,cat){
+  const catName=clusters[cat]?.name||cat;
+  const central=nodes.find(n=>n.id===0);
+  const centralName=central?.label.replace('\n',' ')||'the main concept';
+  const list=nodes.filter(n=>n.id!==0).map(n=>`[${n.id}] ${n.label.replace('\n',' ')} (${clusters[n.cat]?.name||n.cat})`).join('\n');
+  const prompt=`Brainstorm map for "${centralName}" (wedding & event stationery business).
+Adding: "${label}" (${catName}).
+Existing nodes:\n${list}
+Return ONLY a JSON array of node IDs to connect with, like [3,7,12]. Pick 3-6 most relevant. No explanation.`;
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:150,messages:[{role:'user',content:prompt}]})
+  });
+  const data=await res.json();
+  const text=data.content?.[0]?.text||'[]';
+  const ids=JSON.parse(text.match(/\[[\d,\s]*\]/)?.[0]||'[]');
+  return new Set(ids.filter(id=>nodes.some(n=>n.id===id)));
+}
+
+function renderPicker(suggested){
+  const bd=document.getElementById('ap-bd'); bd.innerHTML='';
+
+  if(!apiKey){
+    const note=document.createElement('div');
+    note.className='no-ai';
+    note.innerHTML='<strong>Smart suggestions</strong> based on cluster relationships. <a href="#" onclick="openSettings();return false">Add API key</a> for AI-powered suggestions.';
+    bd.appendChild(note);
+  }
+
+  // Group by cluster
+  const byCat={};
+  nodes.forEach(n=>{ if(!byCat[n.cat])byCat[n.cat]=[]; byCat[n.cat].push(n); });
+
+  // Central node first
+  const centralNode=nodes.find(n=>n.id===0);
+  if(centralNode){
+    const sec=document.createElement('div'); sec.className='cs';
+    sec.innerHTML='<div class="cs-tt">Core</div>';
+    sec.appendChild(mkItem(centralNode,true,false));
+    bd.appendChild(sec);
+  }
+
+  const ord=['products','styles','materials','market','business'];
+  const custom=Object.keys(byCat).filter(k=>!ord.includes(k)&&k!=='central');
+  [...ord,...custom].filter(k=>byCat[k]).forEach(catId=>{
+    const cl=clusters[catId]||{}, col=C[cl.ck||'gray'];
+    const sec=document.createElement('div'); sec.className='cs';
+    sec.innerHTML=`<div class="cs-tt"><div class="cs-dot" style="background:${col.s}"></div>${cl.name||catId}</div>`;
+    byCat[catId].forEach(n=>{ if(n.id!==0)sec.appendChild(mkItem(n,suggested.has(n.id),!!apiKey&&suggested.has(n.id))); });
+    bd.appendChild(sec);
+  });
+}
+
+function mkItem(node,preCheck,showAI){
+  const div=document.createElement('div'); div.className='ci';
+  const chk=document.createElement('input'); chk.type='checkbox'; chk.checked=preCheck||pSel.has(node.id);
+  if(chk.checked)pSel.add(node.id);
+  chk.onchange=()=>{ chk.checked?pSel.add(node.id):pSel.delete(node.id); updateSelCount(); };
+  const info=document.createElement('div');
+  info.innerHTML=`<span class="ci-nm">${node.label.replace('\n',' ')}</span>`;
+  if(showAI){ const b=document.createElement('span'); b.className='ai-b'; b.textContent='AI ✦'; div.appendChild(chk); div.appendChild(info); div.appendChild(b); }
+  else { div.appendChild(chk); div.appendChild(info); }
+  div.onclick=e=>{ if(e.target!==chk){chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));} };
+  return div;
+}
+
+function updateSelCount(){
+  document.getElementById('ap-cnt').textContent=pSel.size>0?`${pSel.size} connection${pSel.size!==1?'s':''} selected`:'';
+}
+
+function confirmAdd(){
+  if(!pNode){closeOv('ap-ov');return;}
+  // Position near connected nodes
+  const cnodes=nodes.filter(n=>pSel.has(n.id));
+  if(cnodes.length>0){
+    pNode.x=cnodes.reduce((s,n)=>s+(n.x||svgW/2),0)/cnodes.length+(Math.random()-.5)*100;
+    pNode.y=cnodes.reduce((s,n)=>s+(n.y||svgH/2),0)/cnodes.length+(Math.random()-.5)*100;
+  }
+  nodes.push(pNode); nextId++;
+  pSel.forEach(tid=>links.push({source:pNode.id,target:tid}));
+  document.getElementById('add-in').value='';
+  closeOv('ap-ov'); pNode=null; pSel=new Set();
+  redraw();
+}
+
+// ══════════ SETTINGS ═══════════════════════
+function openSettings(){
+  document.getElementById('ak-in').value=apiKey;
+  document.getElementById('st-ov').style.display='flex';
+}
+function saveSettings(){
+  apiKey=document.getElementById('ak-in').value.trim();
+  localStorage.setItem('bm_apikey',apiKey);
+  closeOv('st-ov');
+}
+function confirmReset(){
+  if(confirm('Reset everything to defaults? This cannot be undone.')){
+    localStorage.removeItem('bm_state'); location.reload();
+  }
+}
+
+// ══════════ MODALS ═════════════════════════
+function closeOv(id){ document.getElementById(id).style.display='none'; }
+
+// ══════════ INIT ═══════════════════════════
+loadState();
+document.addEventListener('DOMContentLoaded',()=>{
+  initSim(); updateCatSel(); redraw();
+  document.getElementById('h-r').textContent=`${nodes.length} nodes · ${links.length} links`;
+});
+</script>
+</body>
+</html>
